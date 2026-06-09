@@ -1,5 +1,5 @@
 "use client";
-
+import { supabase } from '@/utils/supabase';
 import { useState, useEffect, useRef } from 'react';
 
 // 1. CSV 파싱 함수
@@ -413,4 +413,5 @@ export default function Home() {
     </main>
   );
 }
+// 강제 재배포를 위한 주석입니다.
 // 강제 재배포를 위한 주석입니다.
