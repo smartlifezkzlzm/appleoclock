@@ -58,7 +58,7 @@ export default function Home() {
   const [bannerIndex, setBannerIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(true);
 
-  // 구글 시트 연동 및 뒤로가기 이벤트 세팅
+  // 구글 시트 연동 및 뒤로가기 세팅
   useEffect(() => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
@@ -87,6 +87,7 @@ export default function Home() {
     return foundKey ? product[foundKey]?.trim() : '';
   };
 
+  // 캐로슬 전용 상위 5개 상품 추출
   const carouselProducts = products.filter(p => {
     const status = getProductValue(p, 'status') || '판매중';
     return !status.includes('판매중지');
@@ -94,6 +95,7 @@ export default function Home() {
   
   const displayBanners = [...carouselProducts, ...carouselProducts];
 
+  // 캐로슬 타이머
   useEffect(() => {
     if (selectedProductId || carouselProducts.length === 0) return; 
     const timer = setInterval(() => {
@@ -110,6 +112,7 @@ export default function Home() {
     }
   };
 
+  // 하단 구매버튼 스크롤 감지
   useEffect(() => {
     if (!selectedProductId || !primaryButtonsRef.current) {
       setShowBottomBar(false);
@@ -150,7 +153,6 @@ export default function Home() {
     </footer>
   );
 
-  // 상품 필터링 로직
   const filteredProducts = products.filter(product => {
     const title = getProductValue(product, 'title');
     const status = getProductValue(product, 'status') || '판매중';
@@ -171,11 +173,10 @@ export default function Home() {
         .carousel-item { flex: 0 0 calc(100% / var(--visible-items)); }
       `}} />
 
-      {/* --- [수정] 통합 공통 상단 헤더 (어느 화면에서나 고정됨) --- */}
+      {/* --- 통합 공통 상단 헤더 --- */}
       <header className="bg-white sticky top-0 z-50 border-b border-slate-100 shadow-sm w-full">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-2 md:gap-4">
           
-          {/* 상세페이지에서만 나타나는 '뒤로가기' 화살표 */}
           {selectedProductId && (
             <button 
               onClick={() => window.history.back()} 
@@ -199,17 +200,25 @@ export default function Home() {
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
-                // 상세페이지에서 검색어 입력 시, 즉시 메인 화면으로 빠져나가 검색 결과를 보여줍니다.
                 if (selectedProductId) {
                   setSelectedProductId(null);
                   window.history.pushState(null, '', '/');
                 }
               }}
-              className="bg-transparent outline-none w-full text-sm text-slate-700" 
+              className="bg-transparent outline-none w-full text-sm text-slate-700 hidden md:block" 
             />
-            <svg className="w-5 h-5 text-slate-400 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            <svg className="w-5 h-5 text-slate-400 ml-2 hidden md:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
           </div>
 
+          {/* 로그인 버튼 */}
+          <div 
+            className="text-sm font-bold text-slate-600 hover:text-slate-900 cursor-pointer transition ml-2 whitespace-nowrap"
+            onClick={() => window.location.href = '/login'}
+          >
+            로그인
+          </div>
+
+          {/* 장바구니 아이콘 */}
           <div className="relative p-1 text-slate-700 cursor-pointer ml-1 md:ml-2">
             <svg className="w-6 h-6 md:w-7 md:h-7" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" /></svg>
             {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 w-4 md:h-5 md:w-5 flex items-center justify-center">{cartCount}</span>}
@@ -223,7 +232,6 @@ export default function Home() {
               key={idx} 
               onClick={() => {
                 setSelectedCategory(cat);
-                // 카테고리 클릭 시 상세페이지에서 메인으로 자동 복귀
                 if (selectedProductId) {
                   setSelectedProductId(null);
                   window.history.pushState(null, '', '/');
@@ -239,7 +247,6 @@ export default function Home() {
 
       {/* --- 본문 영역 분기 --- */}
       {selectedProductId && currentProduct ? (
-        // [상세페이지 본문]
         <div className="w-full flex flex-col flex-grow items-center">
           {(() => {
             const id = getProductValue(currentProduct, 'id');
@@ -318,7 +325,7 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* 하단 고정 구매 버튼 (스크롤 감지 연동) */}
+                {/* 하단 고정 스크롤 바 */}
                 <div className={`fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 transition-transform duration-300 ease-in-out ${(showBottomBar && selectedProductId) ? 'translate-y-0' : 'translate-y-full'}`}>
                   <div className="max-w-4xl mx-auto flex h-16">
                     <button onClick={handleAddToCart} className="w-1/2 bg-white text-slate-800 font-bold border-r border-slate-200 hover:bg-slate-50 transition flex items-center justify-center gap-2">
@@ -335,7 +342,6 @@ export default function Home() {
           })()}
         </div>
       ) : (
-        // [메인페이지 본문]
         <div className="w-full flex flex-col flex-grow">
           {carouselProducts.length > 0 && (
             <section className="w-full bg-slate-900 py-6 overflow-hidden border-b border-slate-800">
@@ -403,7 +409,6 @@ export default function Home() {
         </div>
       )}
       
-      {/* 화면의 끝(상세/메인 공통)에 푸터 부착 */}
       <Footer />
     </main>
   );
