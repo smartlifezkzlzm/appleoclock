@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 
-// 1. CSV 파싱 함수: 구글 시트 특유의 유니코드 숨은 글자(BOM) 및 줄바꿈(\r)을 완벽하게 제거
+// 1. CSV 파싱 함수 (구글 시트 특유의 줄바꿈 및 공백 제거)
 function parseCSV(csv: string) {
-  const cleanCSV = csv.replace(/^\uFEFF/, '').replace(/\r/g, ''); // BOM 및 캐리지 리턴 제거
+  const cleanCSV = csv.replace(/^\uFEFF/, '').replace(/\r/g, '');
   const lines = cleanCSV.split('\n');
   const result: Record<string, string>[] = [];
   if (lines.length === 0) return result;
@@ -42,129 +42,17 @@ function parseCSV(csv: string) {
   return result;
 }
 
-// 2. 개별 상품 카드 컴포넌트: 옵션 선택 상태 및 장바구니 클릭 로직을 독립적으로 처리
-function ProductCard({ product }: { product: any }) {
-  // 구글 시트 헤더 명칭의 미세한 공백이나 따옴표 꼬임을 유연하게 방어하는 유틸리티
-  const getValue = (keys: string[]) => {
-    for (const key of keys) {
-      if (product[key] !== undefined) return product[key];
-      const cleanKey = key.replace(/"/g, '').trim();
-      for (const prodKey in product) {
-        if (prodKey.trim().replace(/"/g, '') === cleanKey) {
-          return product[prodKey];
-        }
-      }
-    }
-    return '';
-  };
-
-  const id = getValue(['id', '상품코드', '상품 코드']);
-  const title = getValue(['title', '상품명', '상품 명']) || '상품명 없음';
-  const price = getValue(['price', '판매가격', '판매 가격']) || 0;
-  const status = getValue(['status', '판매상태', '판매 상태']) || '판매중';
-  const description = getValue(['description', '간단설명', '간단 설명']);
-  const optionsStr = getValue(['options', '옵션 리스트', '옵션리스트', '옵션']);
-
-  const [selectedOption, setSelectedOption] = useState('');
-
-  // '판매중지' 상태인 위탁 상품은 화면에서 노출하지 않음
-  if (status.includes('판매중지')) return null;
-
-  // 닷홈 이미지 호스팅 주소 자동 매칭 규칙 (_detail_01.png)
-  const thumbnailUrl = `https://zkzlzm.dothome.co.kr/img/product_assets/images/${id}_detail_01.png`;
-
-  // 옵션 JSON 데이터 안전하게 파싱
-  let parsedOptions = [];
-  if (optionsStr) {
-    try {
-      let cleanJson = optionsStr.trim();
-      if (cleanJson.startsWith('"') && cleanJson.endsWith('"')) {
-        cleanJson = cleanJson.slice(1, -1).replace(/"{2}/g, '"');
-      }
-      parsedOptions = JSON.parse(cleanJson);
-    } catch (e) {
-      console.error("옵션 데이터 파싱 실패:", e);
-    }
-  }
-
-  // 장바구니 담기 클릭 핸들러 (유저 인터랙션 확인용 알림 추가)
-  const handleAddToCart = () => {
-    if (parsedOptions.length > 0 && !selectedOption) {
-      alert('⚠️ [필수] 옵션을 선택해 주세요!');
-      return;
-    }
-    
-    // 성공 시 작동을 눈으로 확인하기 위한 alert 팝업
-    alert(`🛒 장바구니 담기 성공!\n\n• 상품명: ${title}\n• 선택옵션: ${selectedOption || '없음'}\n• 결제금액: ${Number(price).toLocaleString()}원\n\n정상적으로 작동합니다. 단계별 로드맵에 맞춰 백엔드 연동을 이어가면 됩니다!`);
-  };
-
-  return (
-    <div className="border border-slate-100 rounded-lg p-5 shadow-sm hover:shadow-md transition bg-white flex flex-col justify-between">
-      <div>
-        {/* 상품 이미지 영역 */}
-        <div className="w-full h-[250px] bg-slate-50 relative rounded-md overflow-hidden mb-5 group">
-           {/* eslint-disable-next-line @next/next/no-img-element */}
-           <img 
-             src={thumbnailUrl}
-             alt={title} 
-             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-             onError={(e) => {
-               // 닷홈에 이미지가 없거나 경로가 틀렸을 때 깨짐 방지용 기본 이미지 처리
-               (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x300?text=Apple+Image+Preparing';
-             }}
-           />
-        </div>
-        
-        {/* 상품 주요 정보 */}
-        <h3 className="text-lg font-bold text-slate-800 mb-2">{title}</h3>
-        <p className="text-slate-500 text-sm mb-4 leading-relaxed line-clamp-2 h-10">
-          {description}
-        </p>
-      </div>
-
-      <div>
-        <div className="text-xl font-bold text-red-600 mb-4">
-          {Number(price).toLocaleString()}원
-        </div>
-
-        {/* 옵션 선택창 */}
-        {parsedOptions.length > 0 && (
-          <div className="mb-4">
-            <select 
-              value={selectedOption}
-              onChange={(e) => setSelectedOption(e.target.value)}
-              className="w-full border border-slate-300 p-2 text-sm rounded bg-white text-slate-700 outline-none focus:border-slate-800 transition cursor-pointer"
-            >
-              <option value="">[필수] 옵션을 선택해 주세요</option>
-              {parsedOptions.map((opt: any, optIdx: number) => (
-                <option key={optIdx} value={opt.name}>
-                  {opt.name} {Number(opt.addPrice) > 0 ? `(+${Number(opt.addPrice).toLocaleString()}원)` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        <button 
-          onClick={handleAddToCart}
-          className="w-full bg-slate-800 text-white py-3 rounded-md hover:bg-slate-700 transition font-medium text-sm active:scale-[0.99]"
-        >
-          장바구니 담기
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// 3. 메인 홈 화면 컴포넌트
+// 2. 메인 홈 화면 컴포넌트
 export default function Home() {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // 상세페이지 이동을 위한 상태 (null이면 메인 상점, 상품코드가 들어가면 상세페이지)
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
   useEffect(() => {
     const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSUFMMm_wd_T5bU3e80Y8P4xfBzuvAGBtSndB9CJa2p47sqbil0KHQzRqeagJEet1g2sol7h5jIBC7m/pub?output=csv";
     
-    // 브라우저 단에서 구글 시트 데이터를 다이렉트로 실시간 페치
     fetch(url)
       .then(res => res.arrayBuffer())
       .then(buffer => {
@@ -180,10 +68,99 @@ export default function Home() {
       });
   }, []);
 
+  // 스프레드시트의 복잡한 헤더 명칭(예: '상품명 (title)')에서 값만 안전하게 뽑아내는 함수
+  const getProductValue = (product: any, keyword: string) => {
+    const foundKey = Object.keys(product).find(key => 
+      key.toLowerCase().includes(keyword.toLowerCase())
+    );
+    return foundKey ? product[foundKey]?.trim() : '';
+  };
+
+  // 현재 상세페이지로 보려는 상품 찾기
+  const currentProduct = products.find(p => getProductValue(p, 'id') === selectedProductId);
+
+  // --- [상세페이지 화면 레이아웃] ---
+  if (selectedProductId && currentProduct) {
+    const id = getProductValue(currentProduct, 'id');
+    const title = getProductValue(currentProduct, 'title') || '상품명 없음';
+    const price = getProductValue(currentProduct, 'price') || 0;
+    const description = getProductValue(currentProduct, 'description');
+    const detailCountStr = getProductValue(currentProduct, 'detailCount') || '1';
+    const detailCount = parseInt(detailCountStr, 10) || 1;
+
+    return (
+      <main className="min-h-screen bg-white pb-20">
+        {/* 상단 네비게이션 바 */}
+        <div className="border-b border-slate-100 sticky top-0 bg-white z-50">
+          <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+            <button 
+              onClick={() => setSelectedProductId(null)} 
+              className="text-slate-600 hover:text-slate-900 flex items-center gap-1 text-sm font-medium"
+            >
+              ← 목록으로 돌아가기
+            </button>
+            <span className="font-bold text-slate-800">애플어클락</span>
+            <div className="w-20"></div>
+          </div>
+        </div>
+
+        {/* 상품 기본 정보 영역 */}
+        <div className="max-w-4xl mx-auto pt-10 px-4 grid grid-cols-1 md:grid-cols-2 gap-10 mb-16">
+          <div className="w-full h-[400px] relative rounded-lg overflow-hidden bg-slate-50">
+            <img 
+              src={`https://zkzlzm.dothome.co.kr/img/product_assets/images/${id}_detail_01.png`}
+              alt={title}
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div className="flex flex-col justify-between py-2">
+            <div className="space-y-4">
+              <h1 className="text-2xl font-bold text-slate-800">{title}</h1>
+              <p className="text-slate-600 leading-relaxed">{description}</p>
+              <div className="text-3xl font-extrabold text-red-600 pt-2">
+                {Number(price).toLocaleString()}원
+              </div>
+            </div>
+            <button 
+              onClick={() => alert('🛒 장바구니에 상품이 담겼습니다!')}
+              className="w-full bg-slate-800 text-white py-4 rounded-md font-medium text-md hover:bg-slate-700 transition mt-6"
+            >
+              장바구니 담기
+            </button>
+          </div>
+        </div>
+
+        {/* 닷홈 호스팅 연동 상세페이지 이미지 순차 출력 영역 */}
+        <div className="max-w-3xl mx-auto px-4 border-t border-slate-100 pt-16">
+          <h2 className="text-center font-bold text-slate-800 mb-10 text-lg">💡 상품 상세 정보</h2>
+          <div className="flex flex-col items-center w-full">
+            {Array.from({ length: detailCount }).map((_, index) => {
+              const pageNum = String(index + 1).padStart(2, '0');
+              const imageUrl = `https://zkzlzm.dothome.co.kr/img/product_assets/images/${id}_detail_${pageNum}.png`;
+              
+              return (
+                <img 
+                  key={pageNum}
+                  src={imageUrl}
+                  alt={`상세내용 ${pageNum}`}
+                  className="w-full h-auto block"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              );
+            })}
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // --- [메인 상점 화면 레이아웃] ---
   return (
     <main className="min-h-screen bg-slate-50/50">
-      {/* 대문 배너 */}
-      <section className="relative w-full h-[400px] bg-slate-900 flex items-center justify-center overflow-hidden">
+      {/* 상단 대문 배너 */}
+      <section className="relative w-full h-[360px] bg-slate-900 flex items-center justify-center overflow-hidden">
         <Image 
           src="/images/6_fruitappleB01_main_01.png" 
           alt="애플어클락 메인 배너" 
@@ -192,37 +169,87 @@ export default function Home() {
           className="object-cover brightness-[0.55]"
         />
         <div className="z-10 text-center pointer-events-none">
-          <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 drop-shadow-lg">
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-3 drop-shadow-lg">
             애플어클락
           </h1>
-          <p className="text-lg md:text-xl text-white font-medium mb-6 drop-shadow-md">
+          <p className="text-md md:text-lg text-white/90 font-medium drop-shadow-md">
             우리 가족의 가장 달콤한 시간
-          </p>
-          <p className="text-md text-white/90 drop-shadow-md">
-            잘 저장되어 단맛이 꽉 찬 A급 가정용 부사
           </p>
         </div>
       </section>
 
-      {/* 실시간 상품 진열대 */}
+      {/* 실시간 상품 리스트 진열대 */}
       <section className="max-w-5xl mx-auto py-16 px-4">
-        <h2 className="text-2xl font-bold text-center text-slate-800 mb-10">
-          애플어클락 실시간 상점
-        </h2>
+        <h2 className="text-xl font-bold text-slate-800 mb-8">인기 판매 상품</h2>
         
         {loading ? (
           <div className="text-center text-slate-500 py-12 bg-white rounded-lg border border-slate-100 shadow-sm">
-            싱싱한 사과 데이터를 구글 시트에서 불러오는 중입니다...
+            스프레드시트에서 사과 정보를 안전하게 가져오는 중입니다...
           </div>
         ) : products.length === 0 ? (
-          <div className="text-center text-slate-500 py-12 border border-slate-200 rounded-lg bg-slate-50">
-            구글 시트에 등록된 상품 정보가 없거나 주소가 올바르지 않습니다.
+          <div className="text-center text-slate-500 py-12 bg-white rounded-lg border border-slate-100 shadow-sm">
+            등록된 상품이 없거나 엑셀 파일 형식을 확인해 주세요.
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {products.map((product, index) => (
-              <ProductCard key={index} product={product} />
-            ))}
+            {products.map((product, index) => {
+              // 포함어(includes) 검색 기법으로 헤더 명칭 완벽 매칭
+              const id = getProductValue(product, 'id');
+              const title = getProductValue(product, 'title') || '상품명 없음';
+              const price = getProductValue(product, 'price') || 0;
+              const status = getProductValue(product, 'status') || '판매중';
+              const description = getProductValue(product, 'description');
+
+              if (status.includes('판매중지')) return null;
+
+              // 닷홈 이미지 자동 연결 주소
+              const thumbnailUrl = `https://zkzlzm.dothome.co.kr/img/product_assets/images/${id}_detail_01.png`;
+
+              return (
+                <div key={index} className="border border-slate-100 rounded-lg p-5 shadow-sm hover:shadow-md transition bg-white flex flex-col justify-between">
+                  <div>
+                    {/* 1. 사진 클릭 시 상세페이지 이동 */}
+                    <div 
+                      onClick={() => setSelectedProductId(id)}
+                      className="w-full h-[240px] bg-slate-50 relative rounded-md overflow-hidden mb-4 group cursor-pointer"
+                    >
+                       <img 
+                         src={thumbnailUrl}
+                         alt={title} 
+                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                         onError={(e) => {
+                           (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x300?text=Apple+Image';
+                         }}
+                       />
+                    </div>
+                    
+                    {/* 2. 상품명 클릭 시 상세페이지 이동 */}
+                    <h3 
+                      onClick={() => setSelectedProductId(id)}
+                      className="text-lg font-bold text-slate-800 mb-2 cursor-pointer hover:text-red-600 transition inline-block"
+                    >
+                      {title}
+                    </h3>
+                    
+                    <p className="text-slate-500 text-sm mb-4 leading-relaxed line-clamp-2 h-10">
+                      {description}
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="text-xl font-bold text-red-600 mb-4">
+                      {Number(price).toLocaleString()}원
+                    </div>
+                    <button 
+                      onClick={() => setSelectedProductId(id)}
+                      className="w-full bg-slate-800 text-white py-3 rounded-md hover:bg-slate-700 transition font-medium text-sm"
+                    >
+                      상세보기 및 주문
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </section>
