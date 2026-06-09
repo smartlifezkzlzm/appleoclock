@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 
-// 1. CSV 파싱 함수 (구글 시트 특유의 줄바꿈 및 공백 제거)
+// 1. CSV 파싱 함수
 function parseCSV(csv: string) {
   const cleanCSV = csv.replace(/^\uFEFF/, '').replace(/\r/g, '');
   const lines = cleanCSV.split('\n');
@@ -47,8 +47,11 @@ export default function Home() {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // 상세페이지 이동을 위한 상태 (null이면 메인 상점, 상품코드가 들어가면 상세페이지)
+  // 상세페이지 전환 상태
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+
+  // [수정포인트 2] 상세페이지 전용 '옵션 선택' 상태 추가
+  const [detailSelectedOption, setDetailSelectedOption] = useState('');
 
   useEffect(() => {
     const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSUFMMm_wd_T5bU3e80Y8P4xfBzuvAGBtSndB9CJa2p47sqbil0KHQzRqeagJEet1g2sol7h5jIBC7m/pub?output=csv";
@@ -68,7 +71,7 @@ export default function Home() {
       });
   }, []);
 
-  // 스프레드시트의 복잡한 헤더 명칭(예: '상품명 (title)')에서 값만 안전하게 뽑아내는 함수
+  // 엑셀 헤더 유연 매칭 함수
   const getProductValue = (product: any, keyword: string) => {
     const foundKey = Object.keys(product).find(key => 
       key.toLowerCase().includes(keyword.toLowerCase())
@@ -76,25 +79,63 @@ export default function Home() {
     return foundKey ? product[foundKey]?.trim() : '';
   };
 
-  // 현재 상세페이지로 보려는 상품 찾기
+  // 현재 보고 있는 상세상품
   const currentProduct = products.find(p => getProductValue(p, 'id') === selectedProductId);
 
-  // --- [상세페이지 화면 레이아웃] ---
+  // 시트에서 가져온 옵션 텍스트를 JSON 배열로 예쁘게 변환하는 함수
+  const parseOptions = (optionsStr: string) => {
+    if (!optionsStr) return [];
+    try {
+      let cleanJson = optionsStr.trim();
+      if (cleanJson.startsWith('"') && cleanJson.endsWith('"')) {
+        cleanJson = cleanJson.slice(1, -1).replace(/"{2}/g, '"'); // 엑셀 중첩 따옴표 방어
+      }
+      return JSON.parse(cleanJson);
+    } catch (e) {
+      console.error("옵션 파싱 실패:", e);
+      return [];
+    }
+  };
+
+  // --- [상세페이지 화면] ---
   if (selectedProductId && currentProduct) {
     const id = getProductValue(currentProduct, 'id');
     const title = getProductValue(currentProduct, 'title') || '상품명 없음';
-    const price = getProductValue(currentProduct, 'price') || 0;
+    const basePrice = parseInt(getProductValue(currentProduct, 'price') || '0', 10);
     const description = getProductValue(currentProduct, 'description');
-    const detailCountStr = getProductValue(currentProduct, 'detailCount') || '1';
-    const detailCount = parseInt(detailCountStr, 10) || 1;
+    const detailCount = parseInt(getProductValue(currentProduct, 'detailCount') || '1', 10);
+    
+    // 옵션 리스트 추출
+    const optionsStr = getProductValue(currentProduct, 'options');
+    const parsedOptions = parseOptions(optionsStr);
+
+    // 선택된 옵션의 '추가 금액' 찾아내기
+    const selectedOptObj = parsedOptions.find((opt: any) => opt.name === detailSelectedOption);
+    const addPrice = selectedOptObj ? parseInt(selectedOptObj.addPrice || '0', 10) : 0;
+    
+    // 기본 가격 + 옵션 추가 금액 = 최종 결제 금액
+    const totalPrice = basePrice + addPrice;
+
+    // 장바구니 담기 클릭 시 작동하는 로직
+    const handleDetailAddToCart = () => {
+      // 옵션이 있는데 선택을 안 한 경우 방어막
+      if (parsedOptions.length > 0 && !detailSelectedOption) {
+        alert('⚠️ [필수] 옵션을 먼저 선택해 주세요!');
+        return;
+      }
+      
+      alert(`🛒 장바구니 담기 성공!\n\n• 상품명: ${title}\n• 선택옵션: ${detailSelectedOption || '기본 (옵션없음)'}\n• 결제금액: ${totalPrice.toLocaleString()}원`);
+    };
 
     return (
       <main className="min-h-screen bg-white pb-20">
-        {/* 상단 네비게이션 바 */}
         <div className="border-b border-slate-100 sticky top-0 bg-white z-50">
           <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
             <button 
-              onClick={() => setSelectedProductId(null)} 
+              onClick={() => {
+                setSelectedProductId(null);
+                setDetailSelectedOption(''); // 뒤로갈 때 옵션 상태 초기화
+              }} 
               className="text-slate-600 hover:text-slate-900 flex items-center gap-1 text-sm font-medium"
             >
               ← 목록으로 돌아가기
@@ -104,33 +145,60 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 상품 기본 정보 영역 */}
         <div className="max-w-4xl mx-auto pt-10 px-4 grid grid-cols-1 md:grid-cols-2 gap-10 mb-16">
           <div className="w-full h-[400px] relative rounded-lg overflow-hidden bg-slate-50">
+            {/* [수정포인트 1 반영] 상세페이지 대표 이미지도 _main_01.png 규칙 사용 */}
             <img 
-              src={`https://zkzlzm.dothome.co.kr/img/product_assets/images/${id}_detail_01.png`}
+              src={`https://zkzlzm.dothome.co.kr/img/product_assets/images/${id}_main_01.png`}
               alt={title}
               className="w-full h-full object-cover"
+              onError={(e) => {
+                 // main_01.png 파일이 없으면 detail_01.png로 대체 (이미지 엑스박스 방지)
+                (e.target as HTMLImageElement).src = `https://zkzlzm.dothome.co.kr/img/product_assets/images/${id}_detail_01.png`;
+              }}
             />
           </div>
-          <div className="flex flex-col justify-between py-2">
-            <div className="space-y-4">
+          
+          <div className="flex flex-col py-2">
+            <div className="space-y-4 flex-grow">
               <h1 className="text-2xl font-bold text-slate-800">{title}</h1>
               <p className="text-slate-600 leading-relaxed">{description}</p>
+              
+              {/* 결제 금액 출력 (옵션 선택 시 실시간 합산됨) */}
               <div className="text-3xl font-extrabold text-red-600 pt-2">
-                {Number(price).toLocaleString()}원
+                {totalPrice.toLocaleString()}원
               </div>
+
+              {/* [수정포인트 2 반영] 상세페이지에 옵션 선택 상자(Select) 추가 */}
+              {parsedOptions.length > 0 && (
+                <div className="pt-6 space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">옵션 선택 (필수)</label>
+                  <select 
+                    value={detailSelectedOption}
+                    onChange={(e) => setDetailSelectedOption(e.target.value)}
+                    className="w-full border border-slate-300 p-3 text-sm rounded-md bg-white text-slate-700 outline-none focus:border-slate-800 transition cursor-pointer"
+                  >
+                    <option value="">옵션을 선택해 주세요</option>
+                    {parsedOptions.map((opt: any, optIdx: number) => (
+                      <option key={optIdx} value={opt.name}>
+                        {opt.name} {parseInt(opt.addPrice, 10) > 0 ? `(+${parseInt(opt.addPrice, 10).toLocaleString()}원)` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
+            
             <button 
-              onClick={() => alert('🛒 장바구니에 상품이 담겼습니다!')}
-              className="w-full bg-slate-800 text-white py-4 rounded-md font-medium text-md hover:bg-slate-700 transition mt-6"
+              onClick={handleDetailAddToCart}
+              className="w-full bg-slate-800 text-white py-4 rounded-md font-medium text-md hover:bg-slate-700 transition mt-6 shadow-md"
             >
               장바구니 담기
             </button>
           </div>
         </div>
 
-        {/* 닷홈 호스팅 연동 상세페이지 이미지 순차 출력 영역 */}
+        {/* 닷홈 호스팅 연동 상세페이지(세로로 길게 나오는 이미지) 영역 */}
         <div className="max-w-3xl mx-auto px-4 border-t border-slate-100 pt-16">
           <h2 className="text-center font-bold text-slate-800 mb-10 text-lg">💡 상품 상세 정보</h2>
           <div className="flex flex-col items-center w-full">
@@ -156,10 +224,9 @@ export default function Home() {
     );
   }
 
-  // --- [메인 상점 화면 레이아웃] ---
+  // --- [메인 상점 화면] ---
   return (
     <main className="min-h-screen bg-slate-50/50">
-      {/* 상단 대문 배너 */}
       <section className="relative w-full h-[360px] bg-slate-900 flex items-center justify-center overflow-hidden">
         <Image 
           src="/images/6_fruitappleB01_main_01.png" 
@@ -178,7 +245,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 실시간 상품 리스트 진열대 */}
       <section className="max-w-5xl mx-auto py-16 px-4">
         <h2 className="text-xl font-bold text-slate-800 mb-8">인기 판매 상품</h2>
         
@@ -193,37 +259,35 @@ export default function Home() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {products.map((product, index) => {
-              // 포함어(includes) 검색 기법으로 헤더 명칭 완벽 매칭
               const id = getProductValue(product, 'id');
               const title = getProductValue(product, 'title') || '상품명 없음';
-              const price = getProductValue(product, 'price') || 0;
+              const price = parseInt(getProductValue(product, 'price') || '0', 10);
               const status = getProductValue(product, 'status') || '판매중';
               const description = getProductValue(product, 'description');
 
               if (status.includes('판매중지')) return null;
 
-              // 닷홈 이미지 자동 연결 주소
-              const thumbnailUrl = `https://zkzlzm.dothome.co.kr/img/product_assets/images/${id}_detail_01.png`;
+              // [수정포인트 1 반영] 메인 상점 목록의 썸네일은 {id}_main_01.png 주소를 불러옵니다.
+              const mainThumbnailUrl = `https://zkzlzm.dothome.co.kr/img/product_assets/images/${id}_main_01.png`;
 
               return (
                 <div key={index} className="border border-slate-100 rounded-lg p-5 shadow-sm hover:shadow-md transition bg-white flex flex-col justify-between">
                   <div>
-                    {/* 1. 사진 클릭 시 상세페이지 이동 */}
                     <div 
                       onClick={() => setSelectedProductId(id)}
                       className="w-full h-[240px] bg-slate-50 relative rounded-md overflow-hidden mb-4 group cursor-pointer"
                     >
                        <img 
-                         src={thumbnailUrl}
+                         src={mainThumbnailUrl}
                          alt={title} 
                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                          onError={(e) => {
-                           (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x300?text=Apple+Image';
+                           // main_01 파일이 닷홈에 없으면 빈 박스가 아니라 detail_01 사진을 대신 보여주도록 안전장치 마련
+                           (e.target as HTMLImageElement).src = `https://zkzlzm.dothome.co.kr/img/product_assets/images/${id}_detail_01.png`;
                          }}
                        />
                     </div>
                     
-                    {/* 2. 상품명 클릭 시 상세페이지 이동 */}
                     <h3 
                       onClick={() => setSelectedProductId(id)}
                       className="text-lg font-bold text-slate-800 mb-2 cursor-pointer hover:text-red-600 transition inline-block"
@@ -238,7 +302,7 @@ export default function Home() {
 
                   <div>
                     <div className="text-xl font-bold text-red-600 mb-4">
-                      {Number(price).toLocaleString()}원
+                      {price.toLocaleString()}원
                     </div>
                     <button 
                       onClick={() => setSelectedProductId(id)}
