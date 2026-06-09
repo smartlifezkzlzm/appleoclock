@@ -3,7 +3,7 @@ import Image from 'next/image';
 // 외부 라이브러리 없이 CSV 데이터의 쉼표와 따옴표(옵션 JSON 등)를 정교하게 분리해 주는 함수
 function parseCSV(csv: string) {
   const lines = csv.split('\n');
-  const result = [];
+  const result: Record<string, string>[] = []; // <- 이렇게 이름표를 붙여줍니다!
   if (lines.length === 0) return result;
   
   const headers = lines[0].split(',').map(h => h.trim());
