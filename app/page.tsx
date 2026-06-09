@@ -53,7 +53,7 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState('홈 (전체)');
   const categories = ['홈 (전체)', '가정용 사과', 'A급 가정용 사과', '과일선물세트'];
 
-  // --- [신규] 카드형 무한 캐로슬 배너 상태 ---
+  // 캐로슬 배너 상태
   const banners = [
     { id: 1, title: "애플어클락 오픈!", sub: "전상품 무료배송", color: "bg-red-500" },
     { id: 2, title: "A급 부사 특가", sub: "매일 먹어도 질리지 않아요", color: "bg-orange-500" },
@@ -63,14 +63,16 @@ export default function Home() {
     { id: 6, title: "대량 구매 / B2B", sub: "농장에서 식탁까지 직송", color: "bg-blue-600" },
   ];
   
-  // 무한 롤링을 위해 배열을 2배로 늘립니다.
   const displayBanners = [...banners, ...banners];
   const [bannerIndex, setBannerIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(true);
 
-  // 1초 단위로 한 칸씩 이동시키는 타이머 (체류시간 1초 + 이동시간 0.5초 = 1.5초 간격)
+  // [신규] 하단 고정 버튼 노출 여부 및 기본 버튼 위치 추적을 위한 상태와 Ref
+  const [showBottomBar, setShowBottomBar] = useState(false);
+  const primaryButtonsRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    if (selectedProductId) return; // 상세페이지에서는 배너 정지
+    if (selectedProductId) return; 
     const timer = setInterval(() => {
       setIsTransitioning(true);
       setBannerIndex((prev) => prev + 1);
@@ -78,15 +80,13 @@ export default function Home() {
     return () => clearInterval(timer);
   }, [selectedProductId]);
 
-  // 배너가 끝까지 갔을 때, 사용자 눈치채지 못하게 0번으로 순간이동(무한 루프 마법)
   const handleTransitionEnd = () => {
     if (bannerIndex >= banners.length) {
-      setIsTransitioning(false); // 애니메이션 끄기
-      setBannerIndex(0);         // 0번으로 강제 이동
+      setIsTransitioning(false); 
+      setBannerIndex(0);         
     }
   };
 
-  // 구글 시트 연동 및 뒤로가기 로직
   useEffect(() => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
@@ -110,6 +110,26 @@ export default function Home() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  // [신규] 상세페이지의 본문 구매 버튼이 화면에서 사라졌는지 감지하는 기능
+  useEffect(() => {
+    if (!selectedProductId || !primaryButtonsRef.current) {
+      setShowBottomBar(false);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // 버튼 영역이 화면 밖으로 나가면(isIntersecting === false) 하단 바를 켭니다.
+        setShowBottomBar(!entry.isIntersecting);
+      },
+      { threshold: 0 } // 요소가 1픽셀이라도 보이면 화면에 있는 것으로 간주
+    );
+
+    observer.observe(primaryButtonsRef.current);
+    
+    return () => observer.disconnect();
+  }, [selectedProductId, products]);
+
   const getProductValue = (product: any, keyword: string) => {
     const foundKey = Object.keys(product).find(key => key.toLowerCase().includes(keyword.toLowerCase()));
     return foundKey ? product[foundKey]?.trim() : '';
@@ -120,7 +140,7 @@ export default function Home() {
   const handleSelectProduct = (id: string) => {
     setSelectedProductId(id);
     window.history.pushState(null, '', `?product=${id}`);
-    window.scrollTo(0, 0); // 상세페이지 이동 시 스크롤 최상단으로
+    window.scrollTo(0, 0); 
   };
 
   // --- [상세페이지 화면] ---
@@ -131,7 +151,6 @@ export default function Home() {
     const description = getProductValue(currentProduct, 'description');
     const detailCount = parseInt(getProductValue(currentProduct, 'detailCount') || '1', 10);
     
-    // 옵션 파싱
     let parsedOptions = [];
     try {
       let cleanJson = getProductValue(currentProduct, 'options').trim();
@@ -159,7 +178,10 @@ export default function Home() {
           <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
             <button onClick={() => window.history.back()} className="text-slate-600 font-bold text-xl">←</button>
             <span className="font-bold text-slate-800">상품 상세</span>
-            <div className="w-8"></div>
+            <div className="relative p-2 text-slate-700">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" /></svg>
+              {cartCount > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center">{cartCount}</span>}
+            </div>
           </div>
         </header>
 
@@ -173,16 +195,11 @@ export default function Home() {
             <p className="text-slate-500 text-sm mb-4">{description}</p>
             <div className="text-3xl font-extrabold text-red-600 mb-6">{totalPrice.toLocaleString()}원</div>
 
-            {/* 카카오톡 문의 배너 */}
-            <div className="bg-[#FEE500] rounded-md p-4 flex items-center justify-center gap-2 cursor-pointer hover:bg-[#F4DC00] transition mb-6 shadow-sm">
-              <svg viewBox="0 0 24 24" fill="#191919" className="w-6 h-6"><path d="M12 3c-5.523 0-10 3.528-10 7.88 0 2.82 1.916 5.289 4.823 6.643-.223.805-.808 2.923-.836 3.037-.035.143.053.14.113.101.078-.052 3.197-2.148 4.475-3.036.463.064.938.095 1.425.095 5.523 0 10-3.528 10-7.88C22 6.528 17.523 3 12 3z"/></svg>
-              <span className="text-[#191919] font-bold text-sm">카카오톡 실시간 상품 문의</span>
-            </div>
-
+            {/* [변경] 옵션 선택이 제일 위로 올라옵니다 */}
             {parsedOptions.length > 0 && (
-              <div className="space-y-2 border-t pt-6">
+              <div className="space-y-2 mb-6 bg-slate-50 p-4 rounded-md">
                 <label className="text-sm font-semibold text-slate-700">옵션 선택 (필수)</label>
-                <select value={detailSelectedOption} onChange={(e) => setDetailSelectedOption(e.target.value)} className="w-full border border-slate-300 p-3 text-sm rounded-md bg-white text-slate-700 outline-none">
+                <select value={detailSelectedOption} onChange={(e) => setDetailSelectedOption(e.target.value)} className="w-full border border-slate-300 p-3 text-sm rounded-md bg-white text-slate-700 outline-none focus:border-slate-800">
                   <option value="">옵션을 선택해 주세요</option>
                   {parsedOptions.map((opt: any, idx: number) => (
                     <option key={idx} value={opt.name}>{opt.name} {parseInt(opt.addPrice, 10) > 0 ? `(+${parseInt(opt.addPrice, 10).toLocaleString()}원)` : ''}</option>
@@ -190,6 +207,22 @@ export default function Home() {
                 </select>
               </div>
             )}
+
+            {/* [신규] 기본 장바구니 / 바로 구매하기 버튼 영역 (스크롤 감지 대상) */}
+            <div ref={primaryButtonsRef} className="flex gap-2 mb-6">
+              <button onClick={handleAddToCart} className="w-1/2 bg-white border border-slate-300 text-slate-800 font-bold py-4 rounded-md hover:bg-slate-50 transition flex items-center justify-center gap-2">
+                장바구니
+              </button>
+              <button onClick={handleBuyNow} className="w-1/2 bg-slate-800 text-white font-bold py-4 rounded-md hover:bg-slate-700 transition">
+                바로 구매하기
+              </button>
+            </div>
+
+            {/* 카카오톡 문의 배너가 기본 구매 버튼 아래에 위치합니다 */}
+            <div className="bg-[#FEE500] rounded-md p-4 flex items-center justify-center gap-2 cursor-pointer hover:bg-[#F4DC00] transition shadow-sm">
+              <svg viewBox="0 0 24 24" fill="#191919" className="w-6 h-6"><path d="M12 3c-5.523 0-10 3.528-10 7.88 0 2.82 1.916 5.289 4.823 6.643-.223.805-.808 2.923-.836 3.037-.035.143.053.14.113.101.078-.052 3.197-2.148 4.475-3.036.463.064.938.095 1.425.095 5.523 0 10-3.528 10-7.88C22 6.528 17.523 3 12 3z"/></svg>
+              <span className="text-[#191919] font-bold text-sm">카카오톡 실시간 상품 문의</span>
+            </div>
           </div>
         </div>
 
@@ -202,8 +235,8 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 하단 고정 50:50 장바구니/구매 액션 바 */}
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200">
+        {/* [변경] 본문 버튼이 사라질 때만 스르륵 나타나는 하단 고정 액션 바 */}
+        <div className={`fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 transition-transform duration-300 ease-in-out ${showBottomBar ? 'translate-y-0' : 'translate-y-full'}`}>
           <div className="max-w-4xl mx-auto flex h-16">
             <button onClick={handleAddToCart} className="w-1/2 bg-white text-slate-800 font-bold border-r border-slate-200 hover:bg-slate-50 transition flex items-center justify-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" /></svg>
@@ -232,7 +265,6 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-slate-50 pb-20">
-      {/* CSS 변수를 활용한 완벽한 반응형 캐로슬 설정 */}
       <style dangerouslySetInnerHTML={{__html: `
         :root { --visible-items: 2; }
         @media (min-width: 768px) { :root { --visible-items: 4; } }
@@ -243,7 +275,6 @@ export default function Home() {
         .carousel-item { flex: 0 0 calc(100% / var(--visible-items)); }
       `}} />
 
-      {/* 1. 상단 글로벌 헤더 (좌측 로고, 우측 검색창 및 장바구니) */}
       <header className="bg-white sticky top-0 z-50 border-b border-slate-100 shadow-sm">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="font-extrabold text-2xl text-slate-800 cursor-pointer flex-shrink-0" onClick={() => { setSearchTerm(''); setSelectedCategory('홈 (전체)'); }}>
@@ -267,7 +298,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 2. 네비게이션 카테고리 바 */}
         <div className="max-w-5xl mx-auto px-4 py-2 flex gap-6 text-sm font-medium overflow-x-auto whitespace-nowrap scrollbar-hide">
           {categories.map((cat, idx) => (
             <span key={idx} onClick={() => setSelectedCategory(cat)} className={`cursor-pointer transition-colors ${selectedCategory === cat ? 'text-red-600 font-bold border-b-2 border-red-600 pb-2' : 'text-slate-500 hover:text-slate-800 pb-2'}`}>
@@ -277,7 +307,6 @@ export default function Home() {
         </div>
       </header>
 
-      {/* 3. 카드형 무한 슬라이딩 배너 (캐로슬) */}
       <section className="w-full bg-slate-800 py-6 overflow-hidden">
         <div className="max-w-6xl mx-auto px-2 relative">
           <div 
@@ -297,7 +326,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 4. 상품 리스트 영역 */}
       <section className="max-w-5xl mx-auto py-10 px-4">
         {loading ? (
           <div className="text-center text-slate-500 py-12">상품 정보를 불러오는 중입니다...</div>
@@ -315,7 +343,6 @@ export default function Home() {
 
               return (
                 <div key={index} onClick={() => handleSelectProduct(id)} className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer border border-slate-100 flex flex-col">
-                  {/* 사진 확대(hover) 효과를 없애고 정규 사이즈 유지 */}
                   <div className="w-full aspect-square bg-slate-50 relative">
                      <img src={mainThumbnailUrl} alt={title} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = `https://zkzlzm.dothome.co.kr/img/product_assets/images/${id}_detail_01.png`; }} />
                   </div>
