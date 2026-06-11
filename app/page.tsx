@@ -58,8 +58,22 @@ export default function Home() {
   const [bannerIndex, setBannerIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(true);
 
-  // 구글 시트 연동 및 뒤로가기 세팅
+  // 💡 추가된 부분: 카카오 로그인 세션(고객 정보)을 담을 그릇
+  const [session, setSession] = useState<any>(null);
+
+  // 구글 시트 연동, 뒤로가기 및 로그인 세션 세팅
   useEffect(() => {
+    // --- 로그인 세션 처리 시작 ---
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    // URL에 남아있는 지저분한 토큰을 감지해서 로그인 처리하고 주소창을 깔끔하게 만들어줍니다.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    // --- 로그인 세션 처리 끝 ---
+
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
       setSelectedProductId(params.get('product'));
@@ -79,7 +93,10 @@ export default function Home() {
       })
       .catch(() => setLoading(false));
 
-    return () => window.removeEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const getProductValue = (product: any, keyword: string) => {
@@ -210,13 +227,22 @@ export default function Home() {
             <svg className="w-5 h-5 text-slate-400 ml-2 hidden md:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
           </div>
 
-          {/* 로그인 버튼 */}
-          <div 
-            className="text-sm font-bold text-slate-600 hover:text-slate-900 cursor-pointer transition ml-2 whitespace-nowrap"
-            onClick={() => window.location.href = '/login'}
-          >
-            로그인
-          </div>
+          {/* 💡 수정된 부분: 로그인 상태에 따라 버튼 변경 */}
+          {session ? (
+            <div 
+              className="text-sm font-bold text-slate-800 hover:text-red-600 cursor-pointer transition ml-2 whitespace-nowrap bg-yellow-100 px-3 py-1.5 rounded-full"
+              onClick={() => window.location.href = '/profile'}
+            >
+              {session.user.user_metadata.name}님
+            </div>
+          ) : (
+            <div 
+              className="text-sm font-bold text-slate-600 hover:text-slate-900 cursor-pointer transition ml-2 whitespace-nowrap"
+              onClick={() => window.location.href = '/login'}
+            >
+              로그인
+            </div>
+          )}
 
           {/* 장바구니 아이콘 */}
           <div className="relative p-1 text-slate-700 cursor-pointer ml-1 md:ml-2">
@@ -413,5 +439,3 @@ export default function Home() {
     </main>
   );
 }
-// 강제 재배포를 위한 주석입니다.
-// 강제 재배포를 위한 주석입니다.
