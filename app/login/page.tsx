@@ -1,4 +1,3 @@
-// app/login/page.tsx
 "use client";
 
 import { useState } from 'react';
@@ -29,6 +28,9 @@ export default function Login() {
       provider: 'kakao',
       options: {
         redirectTo: `${window.location.origin}/`,
+        // 💡 핵심 수정: 카카오 비즈니스 채널 권한이 완전히 열리기 전이므로, 
+        // 권한 에러를 피하기 위해 이메일을 제외한 '닉네임'과 '프로필 사진'만 제한하여 요청합니다.
+        scopes: 'profile_nickname profile_image',
       }
     });
     if (error) {
