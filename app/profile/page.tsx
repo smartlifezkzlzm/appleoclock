@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../../utils/supabase';
-// 💡 카카오(다음) 주소 검색 도구 불러오기
 import DaumPostcode from 'react-daum-postcode';
 
 export default function ProfilePage() {
@@ -15,7 +14,6 @@ export default function ProfilePage() {
   const [address, setAddress] = useState('');
   const [detailAddress, setDetailAddress] = useState('');
   
-  // 💡 주소 검색창(팝업)을 띄울지 말지 결정하는 스위치
   const [isOpenPostcode, setIsOpenPostcode] = useState(false);
 
   useEffect(() => {
@@ -45,10 +43,9 @@ export default function ProfilePage() {
     setLoading(false);
   };
 
-  // 💡 주소 검색이 완료되었을 때 실행되는 마법의 함수
   const handleCompletePostcode = (data: any) => {
-    let fullAddress = data.address; // 기본 주소
-    let extraAddress = ''; // 추가 주소 (동, 건물명 등)
+    let fullAddress = data.address;
+    let extraAddress = '';
 
     if (data.addressType === 'R') {
       if (data.bname !== '') extraAddress += data.bname;
@@ -56,11 +53,8 @@ export default function ProfilePage() {
       fullAddress += extraAddress !== '' ? ` (${extraAddress})` : '';
     }
 
-    // 화면의 빈칸에 검색된 우편번호와 주소를 촥! 채워줍니다.
     setZipCode(data.zonecode);
     setAddress(fullAddress);
-    
-    // 검색창 팝업을 닫습니다.
     setIsOpenPostcode(false);
   };
 
@@ -87,6 +81,8 @@ export default function ProfilePage() {
       alert('저장 중 오류가 발생했습니다.');
     } else {
       alert('📦 기본 배송지가 안전하게 저장되었습니다!');
+      // 💡 저장 성공 시 자동으로 홈 화면으로 이동
+      window.location.href = '/';
     }
   };
 
@@ -107,7 +103,6 @@ export default function ProfilePage() {
   return (
     <main className="min-h-screen bg-slate-50 py-12 px-4 relative">
       <div className="max-w-md mx-auto bg-white rounded-xl shadow-sm border border-slate-100 p-8">
-        {/* 뒤로가기 버튼 추가 */}
         <div className="flex items-center mb-6">
           <button onClick={() => window.location.href = '/'} className="text-slate-400 hover:text-slate-800 mr-3 text-xl">←</button>
           <h1 className="text-2xl font-bold text-slate-800">기본 배송지 관리</h1>
@@ -173,10 +168,17 @@ export default function ProfilePage() {
           >
             배송지 저장하기
           </button>
+
+          {/* 💡 쇼핑 홈으로 이동 버튼 추가 */}
+          <button 
+            onClick={() => window.location.href = '/'}
+            className="w-full bg-slate-100 text-slate-700 font-bold py-4 rounded-md hover:bg-slate-200 transition border border-slate-200"
+          >
+            쇼핑 홈으로 이동
+          </button>
         </div>
       </div>
 
-      {/* 💡 주소 검색창 팝업 화면 */}
       {isOpenPostcode && (
         <div className="fixed inset-0 bg-black/50 z-50 flex flex-col items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-xl overflow-hidden shadow-2xl relative">
