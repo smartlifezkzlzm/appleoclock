@@ -1,5 +1,5 @@
 "use client";
-import { supabase } from '@/utils/supabase';
+import { supabase } from '../utils/supabase';
 import { useState, useEffect, useRef } from 'react';
 
 // 1. CSV 파싱 함수
