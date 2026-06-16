@@ -1,14 +1,15 @@
 "use client";
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '../utils/supabase'; // 💡 Supabase 도구 불러오기
 
 export default function CheckoutPage() {
   const router = useRouter();
 
-  // 💡 테스트용 임시 데이터 (실제로는 이전 페이지에서 넘어온 데이터를 받아서 쓰게 됩니다)
+  // 테스트용 임시 데이터
   const dummyProduct = {
     id: "sample_apple_01",
-    title: "A급 가정용 부사사과", // 대표님이 판매하시는 상품명 예시
+    title: "A급 가정용 부사사과",
     option: "5kg 1박스",
     price: 35000,
     imageUrl: "https://zkzlzm.dothome.co.kr/img/product_assets/images/sample_apple_01_main_01.png"
@@ -22,6 +23,46 @@ export default function CheckoutPage() {
     roadAddress: "",
     detailAddress: ""
   });
+  
+  const [isLoading, setIsLoading] = useState(true);
+
+  // 💡 [핵심] 페이지가 열릴 때 로그인 상태와 주소록을 확인합니다.
+  useEffect(() => {
+    const fetchUserAndAddress = async () => {
+      // 1. 현재 로그인한 카카오 유저 정보 가져오기
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        const userName = session.user.user_metadata.name || "";
+
+        // 2. Supabase 주소록(shipping_addresses)에서 내 주소 가져오기
+        const { data: savedAddress, error } = await supabase
+          .from('shipping_addresses')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .order('is_default', { ascending: false }) // 기본 배송지를 제일 먼저 가져옴
+          .limit(1)
+          .single();
+
+        if (savedAddress) {
+          // 저장된 주소가 있으면 폼에 자동 입력
+          setAddress({
+            name: savedAddress.recipient_name || userName,
+            phone: savedAddress.phone || "",
+            postcode: savedAddress.postcode || "",
+            roadAddress: savedAddress.road_address || "",
+            detailAddress: savedAddress.detail_address || ""
+          });
+        } else {
+          // 저장된 주소가 없으면 카카오 이름만이라도 폼에 미리 넣어둠
+          setAddress(prev => ({ ...prev, name: userName }));
+        }
+      }
+      setIsLoading(false);
+    };
+
+    fetchUserAndAddress();
+  }, []);
 
   // 결제하기 버튼 함수
   const handlePayment = () => {
@@ -30,12 +71,11 @@ export default function CheckoutPage() {
       return;
     }
     alert("여기에 포트원 결제창(KPN)이 뜨는 로직이 들어갑니다!");
-    // 향후 여기에 PortOne SDK 호출 코드를 작성합니다.
   };
 
   return (
     <main className="min-h-screen bg-slate-50 flex flex-col pb-20">
-      {/* 1. 상단 네비게이션 헤더 (상세페이지와 동일한 구조) */}
+      {/* 1. 상단 네비게이션 헤더 */}
       <header className="bg-white sticky top-0 z-50 border-b border-slate-100 shadow-sm w-full">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-2 md:gap-4">
           <button 
@@ -58,7 +98,7 @@ export default function CheckoutPage() {
 
       <div className="max-w-3xl w-full mx-auto px-4 py-6 space-y-6">
         
-        {/* 2. 주문 상품 정보 (메인 사진, 상품명, 옵션, 가격) */}
+        {/* 2. 주문 상품 정보 */}
         <section className="bg-white p-5 rounded-lg shadow-sm border border-slate-100">
           <h2 className="font-bold text-lg text-slate-800 mb-4 border-b pb-2">주문 상품 정보</h2>
           <div className="flex gap-4">
@@ -82,7 +122,10 @@ export default function CheckoutPage() {
 
         {/* 3. 배송지 정보 입력란 */}
         <section className="bg-white p-5 rounded-lg shadow-sm border border-slate-100">
-          <h2 className="font-bold text-lg text-slate-800 mb-4 border-b pb-2">배송지 정보</h2>
+          <h2 className="font-bold text-lg text-slate-800 mb-4 border-b pb-2 flex justify-between items-center">
+            <span>배송지 정보</span>
+            {isLoading && <span className="text-xs text-blue-500 font-normal">정보를 불러오는 중...</span>}
+          </h2>
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1">받으시는 분</label>
