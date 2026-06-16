@@ -1,6 +1,7 @@
 "use client";
 import { supabase } from '../utils/supabase';
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation'; // 💡 화면 이동 도구 추가
 
 // 1. CSV 파싱 함수
 function parseCSV(csv: string) {
@@ -42,6 +43,7 @@ function parseCSV(csv: string) {
 }
 
 export default function Home() {
+  const router = useRouter(); // 💡 라우터 도구 장착
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
@@ -58,7 +60,7 @@ export default function Home() {
   const [bannerIndex, setBannerIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(true);
 
-  // 💡 추가된 부분: 카카오 로그인 세션(고객 정보)을 담을 그릇
+  // 카카오 로그인 세션(고객 정보)을 담을 그릇
   const [session, setSession] = useState<any>(null);
 
   // 구글 시트 연동, 뒤로가기 및 로그인 세션 세팅
@@ -68,7 +70,6 @@ export default function Home() {
       setSession(session);
     });
 
-    // URL에 남아있는 지저분한 토큰을 감지해서 로그인 처리하고 주소창을 깔끔하게 만들어줍니다.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
@@ -227,7 +228,6 @@ export default function Home() {
             <svg className="w-5 h-5 text-slate-400 ml-2 hidden md:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
           </div>
 
-          {/* 💡 수정된 부분: 로그인 상태에 따라 버튼 변경 */}
           {session ? (
             <div 
               className="text-sm font-bold text-slate-800 hover:text-red-600 cursor-pointer transition ml-2 whitespace-nowrap bg-yellow-100 px-3 py-1.5 rounded-full"
@@ -299,7 +299,8 @@ export default function Home() {
 
             const handleBuyNow = () => {
               if (parsedOptions.length > 0 && !detailSelectedOption) return alert('⚠️ [필수] 옵션을 먼저 선택해 주세요!');
-              alert('결제 페이지로 이동합니다.');
+              // 💡 수정한 부분: 이제 경고창을 띄우지 않고 바로 결제 화면 컴포넌트로 라우팅합니다.
+              router.push('/checkout'); 
             };
 
             return (
