@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { supabase } from '../utils/supabase'; // 💡 Supabase 도구 불러오기
+import { supabase } from '../../utils/supabase'; // 💡 Supabase 도구 불러오기
 
 export default function CheckoutPage() {
   const router = useRouter();
